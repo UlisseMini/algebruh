@@ -23,6 +23,9 @@ class Expr():
     def __neg__(self):
         return -1 * self
 
+    def __pow__(self, n):
+        return Pow(self, n)
+
     def __eq__(self, other):
         # easy cases
         if self is other:
@@ -61,6 +64,15 @@ class DistOp(BinaryOp):
     a * (b + c) = a * b + b * c
     """
     pass
+
+
+class Pow(BinaryOp):
+    @property
+    def op(_):
+        return '**'
+
+    def __repr__(self):
+        return f'({self[0]}**{self[1]})'
 
 class Mul(AssocOp, DistOp):
     @property
@@ -156,6 +168,12 @@ def simplify(expr: Expr):
     x
     >>> simplify((1 * x) + (1 * x))
     (2 * x)
+    >>> simplify(x*x)
+    (x**2)
+    >>> simplify(x**2 * x**3)
+    (x**5)
+    >>> simplify(x**2 + 2*x**2)
+    (3 * x**2)
     """
     expr = to_expr(expr)
     if isinstance(expr, AtomicExpr):
@@ -166,6 +184,7 @@ def simplify(expr: Expr):
         if a == 0: return b
         if b == 0: return a
         if a == b: return 2*a
+
         return a + b
     elif isinstance(expr, Mul):
         a = simplify(expr[0])
@@ -173,7 +192,20 @@ def simplify(expr: Expr):
         if a == 0 or b == 0: return to_expr(0)
         if a == 1: return b
         if b == 1: return a
+        if a == b:
+            return a**2
+
+        if isinstance(a, Pow) and isinstance(b, Pow) and a[0] == b[0]:
+            return Pow(a[0], a[1]+b[1])
+
         return a*b
+    elif isinstance(expr, Pow):
+        a = simplify(expr[0])
+        b = simplify(expr[1])
+        if b == 1:
+            return a
+
+        return a**b
     else:
         raise ValueError(f'{type(expr)} is not handled')
 
@@ -193,6 +225,8 @@ def derivative(expr: Expr, var: Symbol):
     2
     >>> derivative(x*x, x)
     (2 * x)
+    >>> derivative(x**2 + 3*x**3 + 5, x)
+    ((2 * x) + (9 * x**3))
     """
     expr = simplify(to_expr(expr))
 
@@ -204,6 +238,10 @@ def derivative(expr: Expr, var: Symbol):
             derivative(expr[0], var)*expr[1]
             + derivative(expr[1], var)*expr[0]
         )
+    elif isinstance(expr, Pow):
+        a = expr[0] # a**n
+        n = expr[1]
+        return n * a**(n-1)
     elif isinstance(expr, Integer):
         return 0
     elif isinstance(expr, Symbol):
