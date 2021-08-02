@@ -1,3 +1,5 @@
+from functools import wraps
+
 class Expr():
     """
     Base class for expressions
@@ -136,6 +138,7 @@ def to_expr(thing):
 
 
 def to_expr_ret(fn):
+    @wraps(fn)
     def _fn(*args, **kwargs):
         return to_expr(fn(*args, **kwargs))
     return _fn
@@ -176,6 +179,7 @@ def simplify(expr: Expr):
 
 
 def simplify_ret(fn):
+    @wraps(fn)
     def _fn(*args, **kwargs):
         return simplify(fn(*args, **kwargs))
     return _fn
@@ -204,7 +208,6 @@ def derivative(expr: Expr, var: Symbol):
         return 0
     elif isinstance(expr, Symbol):
         return 1 if expr == var else 0
-
     else:
         raise ValueError(f'not expecting {type(expr)}')
 
