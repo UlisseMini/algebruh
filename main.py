@@ -26,10 +26,6 @@ class Expr():
         if self is other:
             return True
 
-        # We want Integer(5) == 5
-        # if type(self) != type(other):
-        #     return False
-
         # FIXME: Extremely slow and stupid, use hashes or something
         return repr(to_expr(self)) == repr(to_expr(other))
 
@@ -149,13 +145,13 @@ def to_expr_ret(fn):
 def simplify(expr: Expr):
     """
     Simplify an expression
-    >>> simplify(Symbol('x') + 0)
+    >>> simplify(x + 0)
     x
-    >>> simplify(Symbol('x')*0)
+    >>> simplify(x*0)
     0
-    >>> simplify(Symbol('x')*1)
+    >>> simplify(x*1)
     x
-    >>> simplify((1 * Symbol('x')) + (1 * Symbol('x')))
+    >>> simplify((1 * x) + (1 * x))
     (2 * x)
     """
     expr = to_expr(expr)
@@ -189,9 +185,9 @@ def simplify_ret(fn):
 def derivative(expr: Expr, var: Symbol):
     """
     Take the derivative of expr with respect to var
-    >>> derivative(Symbol('x')*2, Symbol('x'))
+    >>> derivative(x*2, x)
     2
-    >>> derivative(Symbol('x')*Symbol('x'), Symbol('x'))
+    >>> derivative(x*x, x)
     (2 * x)
     """
     expr = simplify(to_expr(expr))
@@ -230,5 +226,8 @@ def to_sexpr(expr):
 
 if __name__ == '__main__':
     import doctest
+    # symbols for use in testing
+    x = Symbol('x')
+
     doctest.testmod()
     print('passed')
