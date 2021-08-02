@@ -161,15 +161,15 @@ def simplify(expr: Expr):
     if isinstance(expr, AtomicExpr):
         return expr
     elif isinstance(expr, Add):
-        a = simplify(expr.args[0])
-        b = simplify(expr.args[1])
+        a = simplify(expr[0])
+        b = simplify(expr[1])
         if a == 0: return b
         if b == 0: return a
         if a == b: return 2*a
         return a + b
     elif isinstance(expr, Mul):
-        a = simplify(expr.args[0])
-        b = simplify(expr.args[1])
+        a = simplify(expr[0])
+        b = simplify(expr[1])
         if a == 0 or b == 0: return to_expr(0)
         if a == 1: return b
         if b == 1: return a
@@ -197,12 +197,12 @@ def derivative(expr: Expr, var: Symbol):
     expr = simplify(to_expr(expr))
 
     if isinstance(expr, Add):
-        return derivative(expr.args[0], var) + derivative(expr.args[1], var)
+        return derivative(expr[0], var) + derivative(expr[1], var)
     elif isinstance(expr, Mul):
         # product rule
         return (
-            derivative(expr.args[0], var)*expr.args[1]
-            + derivative(expr.args[1], var)*expr.args[0]
+            derivative(expr[0], var)*expr[1]
+            + derivative(expr[1], var)*expr[0]
         )
     elif isinstance(expr, Integer):
         return 0
