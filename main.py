@@ -31,7 +31,7 @@ class Expr():
         #     return False
 
         # FIXME: Extremely slow and stupid, use hashes or something
-        return repr(self) == repr(other)
+        return repr(to_expr(self)) == repr(to_expr(other))
 
     def __ne__(self, other):
         return not (self == other)
@@ -48,6 +48,8 @@ class BinaryOp(Expr):
     def op(_):
         raise NotImplementedError
 
+    def __getitem__(self, attr):
+        return self.args[attr]
 
 class AssocOp(BinaryOp):
     """Associative property for op *
@@ -68,7 +70,7 @@ class Mul(AssocOp, DistOp):
         return '*'
 
     def __repr__(self):
-        return f'({self.args[0]} * {self.args[1]})'
+        return f'({self[0]} * {self[1]})'
 
 
 class Add(AssocOp, DistOp):
@@ -77,7 +79,7 @@ class Add(AssocOp, DistOp):
         return '+'
 
     def __repr__(self):
-        return f'({self.args[0]} + {self.args[1]})'
+        return f'({self[0]} + {self[1]})'
 
 
 class AtomicExpr(Expr):
@@ -86,7 +88,6 @@ class AtomicExpr(Expr):
     """
     def __init__(self):
         super().__init__()
-        self.args = []
 
 
 class Symbol(AtomicExpr):
@@ -120,71 +121,6 @@ class Integer(AtomicExpr):
         return Add(self, other)
 
 
-def derivative(expr: Expr, var: Symbol):
-    """
-    Take the derivative of expr with respect to var
-    >>> derivative(Symbol('x')*2, Symbol('x'))
-    2
-    >>> derivative(Symbol('x')*Symbol('x'), Symbol('x'))
-    (2 * x)
-    >>> derivative(Symbol('x')*Symbol('x')*Symbol('x'), Symbol('x'))
-    (3 * x * x)
-    """
-    expr = simplify(to_expr(expr))
-
-    if isinstance(expr, Add):
-        return simplify(derivative(expr.args[0], var) + derivative(expr.args[1], var))
-    elif isinstance(expr, Mul):
-        # product rule
-        return simplify(
-            derivative(expr.args[0], var)*expr.args[1]
-            + derivative(expr.args[1], var)*expr.args[0]
-        )
-    elif isinstance(expr, Integer):
-        return to_expr(0)
-    elif isinstance(expr, Symbol):
-        return to_expr(1) if expr == var else to_expr(0)
-
-    raise ValueError(f'not expecting {type(expr)}')
-
-
-def is_zero(expr: Expr):
-    return expr == Integer(0)
-
-def simplify(expr: Expr):
-    """
-    Simplify an expression
-    >>> simplify(Symbol('x') + 0)
-    x
-    >>> simplify(Symbol('x')*0)
-    0
-    >>> simplify(Symbol('x')*1)
-    x
-    >>> simplify((1 * Symbol('x')) + (1 * Symbol('x')))
-    (2 * x)
-    """
-    expr = to_expr(expr)
-    if isinstance(expr, AtomicExpr):
-        return expr
-    elif isinstance(expr, Add):
-        a = simplify(expr.args[0])
-        b = simplify(expr.args[1])
-        if is_zero(a): return b
-        if is_zero(b): return a
-        if a == b: return 2*a
-        return a + b
-    elif isinstance(expr, Mul):
-        a = simplify(expr.args[0])
-        b = simplify(expr.args[1])
-        if is_zero(a) or is_zero(b):
-            return to_expr(0)
-        if a == Integer(1): return b
-        if b == Integer(1): return a
-        return a*b
-    else:
-        raise ValueError(f'{type(expr)} is not handled')
-
-
 def to_expr(thing):
     """Convert a python type to an algebruh type if possible
     >>> to_expr(5) == Integer(5)
@@ -203,6 +139,80 @@ def to_expr(thing):
     raise ValueError(f'Cannot convert {thing} to Expr')
 
 
+def to_expr_ret(fn):
+    def _fn(*args, **kwargs):
+        return to_expr(fn(*args, **kwargs))
+    return _fn
+
+
+@to_expr_ret
+def simplify(expr: Expr):
+    """
+    Simplify an expression
+    >>> simplify(Symbol('x') + 0)
+    x
+    >>> simplify(Symbol('x')*0)
+    0
+    >>> simplify(Symbol('x')*1)
+    x
+    >>> simplify((1 * Symbol('x')) + (1 * Symbol('x')))
+    (2 * x)
+    """
+    expr = to_expr(expr)
+    if isinstance(expr, AtomicExpr):
+        return expr
+    elif isinstance(expr, Add):
+        a = simplify(expr.args[0])
+        b = simplify(expr.args[1])
+        if a == 0: return b
+        if b == 0: return a
+        if a == b: return 2*a
+        return a + b
+    elif isinstance(expr, Mul):
+        a = simplify(expr.args[0])
+        b = simplify(expr.args[1])
+        if a == 0 or b == 0: return to_expr(0)
+        if a == 1: return b
+        if b == 1: return a
+        return a*b
+    else:
+        raise ValueError(f'{type(expr)} is not handled')
+
+
+def simplify_ret(fn):
+    def _fn(*args, **kwargs):
+        return simplify(fn(*args, **kwargs))
+    return _fn
+
+
+@simplify_ret
+def derivative(expr: Expr, var: Symbol):
+    """
+    Take the derivative of expr with respect to var
+    >>> derivative(Symbol('x')*2, Symbol('x'))
+    2
+    >>> derivative(Symbol('x')*Symbol('x'), Symbol('x'))
+    (2 * x)
+    """
+    expr = simplify(to_expr(expr))
+
+    if isinstance(expr, Add):
+        return derivative(expr.args[0], var) + derivative(expr.args[1], var)
+    elif isinstance(expr, Mul):
+        # product rule
+        return (
+            derivative(expr.args[0], var)*expr.args[1]
+            + derivative(expr.args[1], var)*expr.args[0]
+        )
+    elif isinstance(expr, Integer):
+        return 0
+    elif isinstance(expr, Symbol):
+        return 1 if expr == var else 0
+
+    else:
+        raise ValueError(f'not expecting {type(expr)}')
+
+
 def to_sexpr(expr):
     """Convert expr to an s-expression
     >>> to_sexpr(Integer(2) + Integer(3) * Integer(4))
@@ -217,6 +227,8 @@ def to_sexpr(expr):
         raise ValueError(f'unsupported type {type(expr)}')
 
 
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
+    print('passed')
